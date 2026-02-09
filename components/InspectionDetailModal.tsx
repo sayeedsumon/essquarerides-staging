@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { InspectionRecord } from '../types';
 
 interface InspectionDetailModalProps {
@@ -8,6 +8,7 @@ interface InspectionDetailModalProps {
 }
 
 const InspectionDetailModal: React.FC<InspectionDetailModalProps> = ({ inspection, onClose }) => {
+  const [zoomedImage, setZoomedImage] = useState<{ label: string; src: string } | null>(null);
   const data = inspection.data;
 
   const DetailSection = ({ title, children }: { title: string; children: React.ReactNode }) => (
@@ -20,11 +21,20 @@ const InspectionDetailModal: React.FC<InspectionDetailModalProps> = ({ inspectio
   );
 
   const PhotoCard = ({ label, src }: { label: string; src?: string }) => (
-    <div className="bg-white p-2 rounded-xl border border-gray-100 shadow-sm flex flex-col">
-      <span className="text-[9px] font-black text-gray-400 uppercase mb-2 px-1">{label}</span>
+    <div 
+      className={`bg-white p-2 rounded-xl border border-gray-100 shadow-sm flex flex-col group transition-all ${src ? 'cursor-zoom-in hover:border-blue-200 hover:shadow-md' : ''}`}
+      onClick={() => src && setZoomedImage({ label, src })}
+    >
+      <div className="flex justify-between items-center mb-2 px-1">
+        <span className="text-[9px] font-black text-gray-400 uppercase">{label}</span>
+        {src && (
+          <svg className="w-3 h-3 text-gray-300 group-hover:text-blue-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7"/></svg>
+        )}
+      </div>
       {src ? (
-        <div className="aspect-video w-full overflow-hidden rounded-lg bg-gray-50">
+        <div className="aspect-video w-full overflow-hidden rounded-lg bg-gray-50 relative">
           <img src={src} alt={label} className="w-full h-full object-cover" loading="lazy" />
+          <div className="absolute inset-0 bg-black opacity-0 group-hover:opacity-10 transition-opacity"></div>
         </div>
       ) : (
         <div className="aspect-video w-full bg-gray-50 rounded-lg flex items-center justify-center italic text-gray-400 text-[10px]">
@@ -153,6 +163,34 @@ const InspectionDetailModal: React.FC<InspectionDetailModalProps> = ({ inspectio
         </div>
         <button onClick={onClose} className="px-6 py-2 bg-gray-100 text-gray-900 text-xs font-black rounded-xl uppercase tracking-widest hover:bg-gray-200 transition-all">Close Report</button>
       </div>
+
+      {/* Image Lightbox */}
+      {zoomedImage && (
+        <div 
+          className="fixed inset-0 z-[100] bg-black flex flex-col animate-in fade-in duration-200"
+          onClick={() => setZoomedImage(null)}
+        >
+          <div className="p-4 flex justify-between items-center text-white bg-black/50 backdrop-blur sticky top-0">
+            <div className="flex flex-col">
+              <span className="text-[10px] font-black text-blue-400 uppercase tracking-widest">Original Resolution</span>
+              <h4 className="text-sm font-bold uppercase tracking-tight">{zoomedImage.label}</h4>
+            </div>
+            <button className="p-2 hover:bg-white/10 rounded-full">
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+          </div>
+          <div className="flex-1 overflow-auto flex items-center justify-center p-2">
+            <img 
+              src={zoomedImage.src} 
+              alt={zoomedImage.label} 
+              className="max-w-full max-h-full object-contain shadow-2xl" 
+            />
+          </div>
+          <div className="p-4 text-center bg-black/30 backdrop-blur">
+             <span className="text-[10px] text-gray-400 font-bold uppercase tracking-[0.2em]">Click anywhere to exit view</span>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
