@@ -30,11 +30,12 @@ const ImageUpload: React.FC<ImageUploadProps> = ({
       
       setError(null);
       try {
+        // Optimization: Use 720p resolution. 4K base64 strings are too large for localStorage.
         const constraints: MediaStreamConstraints = {
           video: {
             facingMode: facingMode,
-            width: { ideal: 4096 },
-            height: { ideal: 2160 }
+            width: { ideal: 1280 },
+            height: { ideal: 720 }
           },
           audio: false
         };
@@ -82,12 +83,30 @@ const ImageUpload: React.FC<ImageUploadProps> = ({
     if (!video || !video.videoWidth) return;
 
     const canvas = document.createElement('canvas');
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
+    // Maintain a maximum dimension for storage efficiency
+    const MAX_DIM = 1280;
+    let width = video.videoWidth;
+    let height = video.videoHeight;
+
+    if (width > height) {
+      if (width > MAX_DIM) {
+        height *= MAX_DIM / width;
+        width = MAX_DIM;
+      }
+    } else {
+      if (height > MAX_DIM) {
+        width *= MAX_DIM / height;
+        height = MAX_DIM;
+      }
+    }
+
+    canvas.width = width;
+    canvas.height = height;
     const ctx = canvas.getContext('2d');
     if (ctx) {
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-      const dataUrl = canvas.toDataURL('image/jpeg', 1.0);
+      ctx.drawImage(video, 0, 0, width, height);
+      // Optimization: Using 0.5 quality significantly reduces base64 size for localStorage compatibility
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.5);
       onChange(dataUrl);
       stopCamera();
     }
@@ -147,7 +166,7 @@ const ImageUpload: React.FC<ImageUploadProps> = ({
       {isPreviewOpen && value && (
         <div className="fixed inset-0 z-[200] bg-black/95 flex flex-col p-4" onClick={() => setIsPreviewOpen(false)}>
           <div className="flex justify-between items-center text-white mb-4">
-            <h4 className="text-xs font-black uppercase tracking-widest">{label} (Original Res)</h4>
+            <h4 className="text-xs font-black uppercase tracking-widest">{label} (Optimized View)</h4>
             <button className="p-2 bg-white/10 rounded-full">
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
             </button>
@@ -167,7 +186,7 @@ const ImageUpload: React.FC<ImageUploadProps> = ({
           <div className="p-4 flex justify-between items-center bg-gradient-to-b from-black/80 to-transparent text-white absolute top-0 left-0 right-0 z-[110]">
             <div>
               <h3 className="text-sm font-black uppercase tracking-widest">{label}</h3>
-              <p className="text-[9px] font-bold text-blue-400 uppercase tracking-tighter">High Resolution Enabled</p>
+              <p className="text-[9px] font-bold text-blue-400 uppercase tracking-tighter">Mobile-Optimized Capture</p>
             </div>
             <button onClick={stopCamera} className="p-2 hover:bg-white/20 rounded-full transition-colors">
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" /></svg>
