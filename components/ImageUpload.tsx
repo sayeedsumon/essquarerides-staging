@@ -30,11 +30,10 @@ const ImageUpload: React.FC<ImageUploadProps> = ({
       
       setError(null);
       try {
-        // Request original/highest resolution possible
         const constraints: MediaStreamConstraints = {
           video: {
             facingMode: facingMode,
-            width: { ideal: 4096 }, // Target 4K if available
+            width: { ideal: 4096 },
             height: { ideal: 2160 }
           },
           audio: false
@@ -83,13 +82,11 @@ const ImageUpload: React.FC<ImageUploadProps> = ({
     if (!video || !video.videoWidth) return;
 
     const canvas = document.createElement('canvas');
-    // Set canvas to native camera resolution
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
     const ctx = canvas.getContext('2d');
     if (ctx) {
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-      // Capture at 100% quality as requested
       const dataUrl = canvas.toDataURL('image/jpeg', 1.0);
       onChange(dataUrl);
       stopCamera();
@@ -147,7 +144,6 @@ const ImageUpload: React.FC<ImageUploadProps> = ({
         )}
       </div>
 
-      {/* Full-Res Lightbox Modal */}
       {isPreviewOpen && value && (
         <div className="fixed inset-0 z-[200] bg-black/95 flex flex-col p-4" onClick={() => setIsPreviewOpen(false)}>
           <div className="flex justify-between items-center text-white mb-4">
@@ -166,34 +162,58 @@ const ImageUpload: React.FC<ImageUploadProps> = ({
       )}
 
       {isCameraOpen && (
-        <div className="fixed inset-0 z-[100] bg-black flex flex-col">
-          <div className="p-4 flex justify-between items-center bg-black/50 backdrop-blur text-white">
-            <h3 className="text-sm font-black uppercase tracking-widest">{label}</h3>
-            <button onClick={stopCamera} className="p-2 hover:bg-white/10 rounded-full">
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
+        <div className="fixed inset-0 z-[100] bg-black flex flex-col h-[100dvh]">
+          {/* Immersive Camera UI */}
+          <div className="p-4 flex justify-between items-center bg-gradient-to-b from-black/80 to-transparent text-white absolute top-0 left-0 right-0 z-[110]">
+            <div>
+              <h3 className="text-sm font-black uppercase tracking-widest">{label}</h3>
+              <p className="text-[9px] font-bold text-blue-400 uppercase tracking-tighter">High Resolution Enabled</p>
+            </div>
+            <button onClick={stopCamera} className="p-2 hover:bg-white/20 rounded-full transition-colors">
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" /></svg>
             </button>
           </div>
           
           <div className="flex-1 relative bg-black flex items-center justify-center overflow-hidden">
             <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
+            
+            {/* Viewfinder overlay */}
+            <div className="absolute inset-0 border-[40px] border-black/20 pointer-events-none flex items-center justify-center">
+               <div className="w-64 h-48 border-2 border-white/30 rounded-lg relative">
+                 <div className="absolute -top-1 -left-1 w-4 h-4 border-t-4 border-l-4 border-white"></div>
+                 <div className="absolute -top-1 -right-1 w-4 h-4 border-t-4 border-r-4 border-white"></div>
+                 <div className="absolute -bottom-1 -left-1 w-4 h-4 border-b-4 border-l-4 border-white"></div>
+                 <div className="absolute -bottom-1 -right-1 w-4 h-4 border-b-4 border-r-4 border-white"></div>
+               </div>
+            </div>
+
+            {/* Quality Hint Overlay */}
+            <div className="absolute bottom-32 left-0 right-0 px-6 pointer-events-none text-center">
+               <div className="bg-black/60 backdrop-blur-md px-4 py-3 rounded-2xl border border-white/20 inline-block max-w-xs shadow-2xl">
+                 <p className="text-[10px] font-black text-white uppercase tracking-tight leading-relaxed">
+                   <span className="text-blue-400">HINT:</span> Hold steady. Avoid blurry photos and ensure good lighting for fast approval.
+                 </p>
+               </div>
+            </div>
+
             {error && (
-               <div className="absolute inset-0 flex items-center justify-center p-6 text-center">
+               <div className="absolute inset-0 flex items-center justify-center p-6 text-center z-[120]">
                  <p className="bg-white/90 p-4 rounded-xl text-rose-700 font-bold shadow-2xl">{error}</p>
                </div>
             )}
-            <div className="absolute top-4 left-4 bg-black/40 backdrop-blur-md px-3 py-1 rounded-full border border-white/10">
-               <span className="text-[9px] font-black text-white uppercase tracking-widest">High Res Mode Active</span>
-            </div>
           </div>
 
-          <div className="p-8 flex justify-center items-center bg-black/50 backdrop-blur">
+          {/* Shutter Bar */}
+          <div className="h-32 flex justify-center items-center bg-black z-[110] border-t border-white/5">
             <button
               type="button"
               onClick={capturePhoto}
               disabled={!!error}
-              className={`w-20 h-20 rounded-full border-4 border-white flex items-center justify-center active:scale-90 transition-transform ${!!error ? 'opacity-50 cursor-not-allowed' : ''}`}
+              className={`w-20 h-20 rounded-full border-4 border-white flex items-center justify-center active:scale-90 transition-transform shadow-lg ${!!error ? 'opacity-50 cursor-not-allowed' : ''}`}
             >
-              <div className="w-16 h-16 rounded-full bg-white shadow-inner"></div>
+              <div className="w-16 h-16 rounded-full bg-white shadow-inner flex items-center justify-center">
+                <div className="w-12 h-12 rounded-full border border-gray-200"></div>
+              </div>
             </button>
           </div>
         </div>
