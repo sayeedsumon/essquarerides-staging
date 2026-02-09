@@ -92,6 +92,12 @@ const InspectionDetailModal: React.FC<InspectionDetailModalProps> = ({ inspectio
           <DetailSection title="Verification & Shift">
             <PhotoCard label="Driver Selfie" src={data.selfie} />
             <StatusCard label="Shift Mode" val={data.shiftType?.toUpperCase()} />
+            {data.location && (
+              <StatusCard 
+                label="GPS Coordinates" 
+                val={`${data.location.lat.toFixed(5)}, ${data.location.lng.toFixed(5)}`} 
+              />
+            )}
             <PhotoCard label="Start-of-Shift Location" src={data.vehicleLocationImg} />
           </DetailSection>
 
