@@ -1,9 +1,11 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { User, Vehicle, InspectionRecord, UserRole } from '../types';
 import { storage } from '../services/storage';
 import { Link } from 'react-router-dom';
 import InspectionDetailModal from '../components/InspectionDetailModal';
+
+const ITEMS_PER_PAGE = 20;
 
 const AdminDashboard: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'monitor' | 'drivers' | 'vehicles'>('monitor');
@@ -11,6 +13,11 @@ const AdminDashboard: React.FC = () => {
   const [drivers, setDrivers] = useState<User[]>([]);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [drafts, setDrafts] = useState<InspectionRecord[]>([]);
+
+  // Filters & Pagination
+  const [startDate, setStartDate] = useState<string>('');
+  const [endDate, setEndDate] = useState<string>('');
+  const [currentPage, setCurrentPage] = useState(1);
 
   // Modal states
   const [showDriverModal, setShowDriverModal] = useState(false);
@@ -24,7 +31,8 @@ const AdminDashboard: React.FC = () => {
   const [vehicleForm, setVehicleForm] = useState({ plateNumber: '', model: '', status: 'active' as Vehicle['status'] });
 
   const loadData = () => {
-    setInspections(storage.getInspections().sort((a, b) => b.timestamp - a.timestamp));
+    const allInspections = storage.getInspections().sort((a, b) => b.timestamp - a.timestamp);
+    setInspections(allInspections);
     setDrivers(storage.getDrivers().filter(u => u.role === UserRole.DRIVER));
     setVehicles(storage.getVehicles());
     const singleDraft = storage.getDraft();
@@ -36,6 +44,23 @@ const AdminDashboard: React.FC = () => {
     const interval = setInterval(loadData, 5000);
     return () => clearInterval(interval);
   }, []);
+
+  // Filtered Inspections logic (Range Filter)
+  const filteredInspections = useMemo(() => {
+    return inspections.filter(ins => {
+      const insDateStr = new Date(ins.timestamp).toISOString().split('T')[0];
+      const matchesStart = !startDate || insDateStr >= startDate;
+      const matchesEnd = !endDate || insDateStr <= endDate;
+      return matchesStart && matchesEnd;
+    });
+  }, [inspections, startDate, endDate]);
+
+  // Pagination logic
+  const totalPages = Math.ceil(filteredInspections.length / ITEMS_PER_PAGE);
+  const paginatedInspections = useMemo(() => {
+    const start = (currentPage - 1) * ITEMS_PER_PAGE;
+    return filteredInspections.slice(start, start + ITEMS_PER_PAGE);
+  }, [filteredInspections, currentPage]);
 
   const hasFailures = (ins: InspectionRecord) => {
     const data = ins.data;
@@ -105,6 +130,12 @@ const AdminDashboard: React.FC = () => {
     setShowVehicleModal(true);
   };
 
+  const clearFilters = () => {
+    setStartDate('');
+    setEndDate('');
+    setCurrentPage(1);
+  };
+
   return (
     <div className="max-w-7xl mx-auto px-4 py-8 space-y-8">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -141,46 +172,80 @@ const AdminDashboard: React.FC = () => {
             ))}
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <div className="lg:col-span-2 space-y-4">
-              <h2 className="text-xl font-black text-gray-900 flex items-center uppercase tracking-tight">
-                <span className="relative flex h-3 w-3 mr-3">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-3 w-3 bg-blue-600"></span>
-                </span>
-                Inspection Activity
-              </h2>
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+            <div className="lg:col-span-3 space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-2">
+                <h2 className="text-xl font-black text-gray-900 flex items-center uppercase tracking-tight">
+                  <span className="relative flex h-3 w-3 mr-3">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-3 w-3 bg-blue-600"></span>
+                  </span>
+                  Inspection Activity
+                </h2>
+                <div className="flex flex-wrap items-center gap-3">
+                  <div className="flex items-center space-x-2">
+                    <label className="text-[10px] font-black text-gray-400 uppercase">From:</label>
+                    <input 
+                      type="date" 
+                      value={startDate}
+                      onChange={(e) => { setStartDate(e.target.value); setCurrentPage(1); }}
+                      className="text-xs font-bold border-gray-200 rounded-lg focus:ring-blue-500 p-2 bg-white shadow-sm"
+                    />
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <label className="text-[10px] font-black text-gray-400 uppercase">To:</label>
+                    <input 
+                      type="date" 
+                      value={endDate}
+                      onChange={(e) => { setEndDate(e.target.value); setCurrentPage(1); }}
+                      className="text-xs font-bold border-gray-200 rounded-lg focus:ring-blue-500 p-2 bg-white shadow-sm"
+                    />
+                  </div>
+                  {(startDate || endDate) && (
+                    <button onClick={clearFilters} className="text-[10px] font-black text-rose-600 uppercase hover:underline">Clear Filters</button>
+                  )}
+                </div>
+              </div>
 
               <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
                 <div className="overflow-x-auto">
                   <table className="w-full text-left">
                     <thead className="bg-gray-50 border-b border-gray-200">
                       <tr>
-                        <th className="px-6 py-4 text-[10px] font-black text-gray-500 uppercase tracking-widest">Details</th>
+                        <th className="px-6 py-4 text-[10px] font-black text-gray-500 uppercase tracking-widest">Driver</th>
+                        <th className="px-6 py-4 text-[10px] font-black text-gray-500 uppercase tracking-widest">Vehicle</th>
+                        <th className="px-6 py-4 text-[10px] font-black text-gray-500 uppercase tracking-widest">Submission Date & Time</th>
                         <th className="px-6 py-4 text-[10px] font-black text-gray-500 uppercase tracking-widest">Status</th>
-                        <th className="px-6 py-4 text-[10px] font-black text-gray-500 uppercase tracking-widest">Action</th>
+                        <th className="px-6 py-4 text-[10px] font-black text-gray-500 uppercase tracking-widest text-right">Action</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
-                      {drafts.map(d => (
+                      {currentPage === 1 && !startDate && !endDate && drafts.map(d => (
                         <tr key={d.id} className="bg-amber-50/20">
+                          <td className="px-6 py-4 whitespace-nowrap font-bold text-gray-900">{d.driverName}</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-xs font-mono font-bold text-blue-700 uppercase">{d.plateNumber}</td>
                           <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="font-bold text-gray-900">{d.driverName}</div>
-                            <div className="text-xs font-mono font-bold text-blue-700">{d.plateNumber}</div>
+                            <span className="text-[10px] font-bold text-amber-600 animate-pulse">LIVE DRAFTING...</span>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
-                            <span className="px-2 py-1 bg-amber-100 text-amber-800 text-[10px] font-black rounded uppercase">Live Capturing</span>
+                            <span className="px-2 py-1 bg-amber-100 text-amber-800 text-[10px] font-black rounded uppercase tracking-tighter">Incomplete</span>
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                             <span className="text-[10px] font-bold text-gray-400 uppercase">Updating...</span>
+                          <td className="px-6 py-4 whitespace-nowrap text-right">
+                             <span className="text-[10px] font-bold text-gray-400 uppercase">Updating</span>
                           </td>
                         </tr>
                       ))}
-                      {inspections.map(i => (
+                      {paginatedInspections.map(i => (
                         <tr key={i.id} className="hover:bg-gray-50 transition-colors">
+                          <td className="px-6 py-4 whitespace-nowrap font-bold text-gray-900">{i.driverName}</td>
+                          <td className="px-6 py-4 whitespace-nowrap font-mono font-bold text-gray-600 text-xs">{i.plateNumber}</td>
                           <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="font-bold text-gray-900">{i.driverName}</div>
-                            <div className="text-[10px] font-mono font-bold text-gray-500">{i.plateNumber} • {new Date(i.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</div>
+                            <div className="text-xs font-bold text-gray-800">
+                              {new Date(i.timestamp).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}
+                            </div>
+                            <div className="text-[10px] font-mono font-bold text-gray-400 uppercase">
+                              {new Date(i.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                            </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             {hasFailures(i) ? (
@@ -188,45 +253,77 @@ const AdminDashboard: React.FC = () => {
                                 <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
                                   <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
                                 </svg>
-                                Issue
+                                Alert
                               </span>
                             ) : (
-                              <span className="px-2 py-1 bg-emerald-100 text-emerald-800 text-[10px] font-black rounded uppercase">Pass</span>
+                              <span className="px-2 py-1 bg-emerald-100 text-emerald-800 text-[10px] font-black rounded uppercase">Verified</span>
                             )}
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
+                          <td className="px-6 py-4 whitespace-nowrap text-right">
                             <button 
                               onClick={() => setViewingInspection(i)}
-                              className="px-3 py-1.5 bg-gray-900 text-white text-[10px] font-black rounded-lg hover:bg-blue-600 transition-all uppercase tracking-widest shadow-sm"
+                              className="px-4 py-2 bg-gray-900 text-white text-[10px] font-black rounded-lg hover:bg-blue-600 transition-all uppercase tracking-widest shadow-sm"
                             >
-                              View Full
+                              Report
                             </button>
                           </td>
                         </tr>
                       ))}
+                      {paginatedInspections.length === 0 && (
+                        <tr>
+                          <td colSpan={5} className="px-6 py-12 text-center text-gray-400 font-bold uppercase text-[10px] tracking-widest">
+                            No matching records found for selected range
+                          </td>
+                        </tr>
+                      )}
                     </tbody>
                   </table>
                 </div>
+                
+                {/* Pagination Controls */}
+                {totalPages > 1 && (
+                  <div className="bg-gray-50 px-6 py-4 border-t border-gray-200 flex items-center justify-between">
+                    <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest">
+                      Displaying Page {currentPage} of {totalPages}
+                    </p>
+                    <div className="flex space-x-2">
+                      <button 
+                        disabled={currentPage === 1}
+                        onClick={() => setCurrentPage(prev => prev - 1)}
+                        className="px-4 py-2 bg-white border border-gray-200 rounded-lg text-[10px] font-black uppercase tracking-widest text-gray-700 hover:bg-gray-100 disabled:opacity-50 transition-colors"
+                      >
+                        Prev
+                      </button>
+                      <button 
+                        disabled={currentPage === totalPages}
+                        onClick={() => setCurrentPage(prev => prev + 1)}
+                        className="px-4 py-2 bg-white border border-gray-200 rounded-lg text-[10px] font-black uppercase tracking-widest text-gray-700 hover:bg-gray-100 disabled:opacity-50 transition-colors"
+                      >
+                        Next
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
             <div className="space-y-4">
-              <h2 className="text-xl font-black text-gray-900 uppercase tracking-tight">Recent Alerts</h2>
+              <h2 className="text-xl font-black text-gray-900 uppercase tracking-tight">System Alerts</h2>
               <div className="space-y-3">
                 {inspections.filter(hasFailures).slice(0, 5).map(i => (
                   <div key={i.id} className="bg-rose-50 border-l-4 border-rose-600 p-4 rounded-r-xl shadow-sm cursor-pointer hover:bg-rose-100 transition-colors" onClick={() => setViewingInspection(i)}>
                     <div className="flex justify-between items-start">
-                      <p className="text-[10px] font-black text-rose-900 uppercase tracking-widest">Failure Alert</p>
+                      <p className="text-[10px] font-black text-rose-900 uppercase tracking-widest">Critical Violation</p>
                       <span className="text-[10px] text-rose-600 font-bold">{new Date(i.timestamp).toLocaleDateString()}</span>
                     </div>
-                    <p className="text-xs text-rose-800 mt-1 font-bold">{i.plateNumber}</p>
-                    <p className="text-[10px] text-rose-700 mt-0.5">Critical maintenance issues detected. Tap to inspect report.</p>
+                    <p className="text-xs text-rose-800 mt-1 font-bold">{i.plateNumber} — {i.driverName}</p>
+                    <p className="text-[10px] text-rose-700 mt-0.5">Defect detected. Immediate review required.</p>
                   </div>
                 ))}
                 {inspections.filter(hasFailures).length === 0 && (
                   <div className="bg-emerald-50 border-l-4 border-emerald-600 p-4 rounded-r-xl">
-                    <p className="text-xs font-black text-emerald-900 uppercase">Operational Status</p>
-                    <p className="text-[10px] text-emerald-800 mt-1 font-medium italic">No safety violations detected in recent reports.</p>
+                    <p className="text-xs font-black text-emerald-900 uppercase">Fleet Status: Clear</p>
+                    <p className="text-[10px] text-emerald-800 mt-1 font-medium italic">All recent inspections passed safety protocols.</p>
                   </div>
                 )}
               </div>

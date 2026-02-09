@@ -138,6 +138,16 @@ const InspectionWorkflow: React.FC<InspectionWorkflowProps> = ({ user }) => {
     setIsSubmitting(true);
 
     try {
+      // Attempt to get a final precise location on submission
+      const finalLocation = await new Promise<{lat: number, lng: number} | null>((resolve) => {
+        if (!navigator.geolocation) return resolve(null);
+        navigator.geolocation.getCurrentPosition(
+          (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+          () => resolve(null),
+          { enableHighAccuracy: true, timeout: 6000 }
+        );
+      });
+
       const finalRecord: InspectionRecord = {
         id: 'ins_' + Date.now(),
         driverId: user.id,
@@ -146,7 +156,10 @@ const InspectionWorkflow: React.FC<InspectionWorkflowProps> = ({ user }) => {
         plateNumber: selectedVehicle?.plateNumber || 'unknown',
         timestamp: Date.now(),
         status: 'complete',
-        data: formData
+        data: {
+          ...formData,
+          location: finalLocation || formData.location // Fallback to initial location if fresh one fails
+        }
       };
 
       const currentInspections = storage.getInspections();
@@ -155,7 +168,6 @@ const InspectionWorkflow: React.FC<InspectionWorkflowProps> = ({ user }) => {
         storage.saveInspections([...currentInspections, finalRecord]);
       } catch (storageError) {
         console.warn("Storage full, attempting to clear old records to save the latest one.");
-        // If storage is full, keep only the most recent 3 inspections plus this new one
         const pruned = [...currentInspections.slice(-3), finalRecord];
         storage.saveInspections(pruned);
       }
@@ -163,14 +175,13 @@ const InspectionWorkflow: React.FC<InspectionWorkflowProps> = ({ user }) => {
       isCancelling.current = true;
       storage.saveDraft(null);
 
-      // Brief pause for visual confirmation, then navigate
       setTimeout(() => {
         navigate('/', { replace: true });
       }, 500);
 
     } catch (err) {
       console.error("Critical submission failure:", err);
-      alert("Submission failed. Your device storage might be completely full of photos. Try clearing your browser cache or deleting old photos.");
+      alert("Submission failed. Your device storage might be full.");
       setIsSubmitting(false);
     }
   };
