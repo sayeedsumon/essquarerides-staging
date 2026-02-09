@@ -74,7 +74,7 @@ const InspectionWorkflow: React.FC<InspectionWorkflowProps> = ({ user }) => {
       try {
         storage.saveDraft(draft);
       } catch (e) {
-        console.warn("Auto-save failed: Storage likely full", e);
+        // Silent fail for background draft saves
       }
     }
   }, [formData, selectedVehicle, user]);
@@ -138,7 +138,6 @@ const InspectionWorkflow: React.FC<InspectionWorkflowProps> = ({ user }) => {
     setIsSubmitting(true);
 
     try {
-      // Attempt to get a final precise location on submission
       const finalLocation = await new Promise<{lat: number, lng: number} | null>((resolve) => {
         if (!navigator.geolocation) return resolve(null);
         navigator.geolocation.getCurrentPosition(
@@ -158,7 +157,7 @@ const InspectionWorkflow: React.FC<InspectionWorkflowProps> = ({ user }) => {
         status: 'complete',
         data: {
           ...formData,
-          location: finalLocation || formData.location // Fallback to initial location if fresh one fails
+          location: finalLocation || formData.location 
         }
       };
 
@@ -167,9 +166,15 @@ const InspectionWorkflow: React.FC<InspectionWorkflowProps> = ({ user }) => {
       try {
         storage.saveInspections([...currentInspections, finalRecord]);
       } catch (storageError) {
-        console.warn("Storage full, attempting to clear old records to save the latest one.");
-        const pruned = [...currentInspections.slice(-3), finalRecord];
-        storage.saveInspections(pruned);
+        // Pruning logic to ensure the new submission always saves
+        const pruned = [...currentInspections.slice(-1), finalRecord];
+        try {
+          storage.saveInspections(pruned);
+        } catch (innerError) {
+          alert("System Error: Local database is full. Please contact support to clear logs.");
+          setIsSubmitting(false);
+          return;
+        }
       }
       
       isCancelling.current = true;
@@ -180,8 +185,8 @@ const InspectionWorkflow: React.FC<InspectionWorkflowProps> = ({ user }) => {
       }, 500);
 
     } catch (err) {
-      console.error("Critical submission failure:", err);
-      alert("Submission failed. Your device storage might be full.");
+      console.error("Submission error:", err);
+      alert("System Error: Unable to complete submission at this time.");
       setIsSubmitting(false);
     }
   };
