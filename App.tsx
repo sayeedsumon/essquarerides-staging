@@ -9,53 +9,20 @@ import DriverDashboard from './views/DriverDashboard';
 import InspectionWorkflow from './views/InspectionWorkflow';
 import InspectionHistory from './views/InspectionHistory';
 
-// Extend Window interface for the PWA prompt event
-interface BeforeInstallPromptEvent extends Event {
-  readonly platforms: string[];
-  readonly userChoice: Promise<{
-    outcome: 'accepted' | 'dismissed';
-    platform: string;
-  }>;
-  prompt(): Promise<void>;
-}
-
 const App: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
 
   useEffect(() => {
     storage.initialize();
     const currentUser = storage.getCurrentUser();
     setUser(currentUser);
     setIsLoading(false);
-
-    // Capture the PWA install prompt
-    const handleBeforeInstallPrompt = (e: Event) => {
-      e.preventDefault();
-      setInstallPrompt(e as BeforeInstallPromptEvent);
-    };
-
-    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-    window.addEventListener('appinstalled', () => {
-      setInstallPrompt(null);
-    });
-
-    return () => {
-      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-    };
   }, []);
 
   const handleLogout = () => {
     storage.setCurrentUser(null);
     setUser(null);
-  };
-
-  const triggerInstall = async () => {
-    if (!installPrompt) return;
-    await installPrompt.prompt();
-    const { outcome } = await installPrompt.userChoice;
-    setInstallPrompt(null);
   };
 
   if (isLoading) {
@@ -85,18 +52,6 @@ const App: React.FC = () => {
               </Link>
 
               <div className="flex items-center space-x-2 sm:space-x-4">
-                {installPrompt && (
-                  <button
-                    onClick={triggerInstall}
-                    className="flex items-center space-x-1 px-3 py-1.5 bg-blue-600 text-white text-[10px] font-black rounded-full shadow-lg shadow-blue-200 hover:bg-blue-700 transition-all uppercase tracking-wider animate-pulse"
-                  >
-                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                    </svg>
-                    <span>Install</span>
-                  </button>
-                )}
-                
                 <div className="hidden xs:block text-right">
                   <p className="text-xs font-black text-gray-900 leading-tight">{user.name}</p>
                   <p className="text-[10px] text-gray-500 uppercase font-bold tracking-wider">{user.role}</p>
