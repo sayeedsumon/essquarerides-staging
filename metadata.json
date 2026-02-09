@@ -1,0 +1,8 @@
+{
+  "name": "Essquare Rides",
+  "description": "Professional mobile-first fleet inspection app for drivers and administrators, featuring real-time monitoring and digital signature capture.",
+  "requestFramePermissions": [
+    "camera",
+    "geolocation"
+  ]
+}
